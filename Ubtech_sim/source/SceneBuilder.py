@@ -125,66 +125,37 @@ class SceneBuilder:
 
         elif self.cfg['task_number'] == 2:
             from isaacsim.core.prims import RigidPrim
-            import omni.usd
-            from pxr import UsdGeom, Gf, UsdPhysics
 
-            # 添加原始模板零件（用于克隆）
+            num_parts = self.part_cfg.get('num_parts', 4)
+
+            # 源 prim 直接命名为 _0，与 generate_paths 输出对齐
             self.part_A = stage_utils.add_reference_to_stage(
                 usd_path=part_usds[0],
-                prim_path='/Root/Part_A_Template',
+                prim_path='/Root/Part_A_0',
             )
-
             self.part_B = stage_utils.add_reference_to_stage(
                 usd_path=part_usds[1],
-                prim_path='/Root/Part_B_Template',
+                prim_path='/Root/Part_B_0',
             )
 
-            # 克隆前，先禁用模板的物理属性（避免与克隆的零件冲突）
-            stage = omni.usd.get_context().get_stage()
-            for template_path in ['/Root/Part_A_Template', '/Root/Part_B_Template']:
-                prim = stage.GetPrimAtPath(template_path)
-                if prim.IsValid() and prim.HasAPI(UsdPhysics.RigidBodyAPI):
-                    rb = UsdPhysics.RigidBodyAPI(prim)
-                    rb.CreateRigidBodyEnabledAttr(False)
-
             self.cloner = Cloner()
-            num_parts = self.part_cfg.get('num_parts', 5)
+            # generate_paths("/Root/Part_A", num_parts) → [_0, _1, ..., _{num_parts-1}]
+            # 含源 prim _0，克隆体以 USD Inherits 继承源，物理状态各自独立
             target_paths_A = self.cloner.generate_paths("/Root/Part_A", num_parts)
             self.cloner.clone(
-                source_prim_path="/Root/Part_A_Template",
-                prim_paths=target_paths_A
+                source_prim_path="/Root/Part_A_0",
+                prim_paths=target_paths_A,
             )
 
             target_paths_B = self.cloner.generate_paths("/Root/Part_B", num_parts)
             self.cloner.clone(
-                source_prim_path="/Root/Part_B_Template",
-                prim_paths=target_paths_B
+                source_prim_path="/Root/Part_B_0",
+                prim_paths=target_paths_B,
             )
 
-            # 克隆完成后，隐藏并将原始模板零件移到地下，不参与物理
-            for template_path in ['/Root/Part_A_Template', '/Root/Part_B_Template']:
-                prim = stage.GetPrimAtPath(template_path)
-                if prim.IsValid():
-                    UsdGeom.Imageable(prim).MakeInvisible()
-                    xformable = UsdGeom.Xformable(prim)
-                    xformable.ClearXformOpOrder()
-                    xformable.AddTranslateOp().Set(Gf.Vec3d(0, 0, -100))
-
-            # 只使用克隆的10个零件路径
             clone_paths = list(target_paths_A) + list(target_paths_B)
 
-            # 为所有克隆的零件显式应用 RigidBodyAPI（克隆不会自动继承物理属性）
-            for clone_path in clone_paths:
-                prim = stage.GetPrimAtPath(clone_path)
-                if prim.IsValid():
-                    # 应用 RigidBodyAPI 并启用
-                    rb_api = UsdPhysics.RigidBodyAPI.Apply(prim)
-                    rb_api.CreateRigidBodyEnabledAttr(True)
-                    # 应用 MassAPI
-                    mass_api = UsdPhysics.MassAPI.Apply(prim)
-                    mass_api.CreateMassAttr(0.2)  # 设置质量为 0.2kg
-
-            # 创建 RigidPrim 视图
+            # RigidPrim 使用精确路径列表，总数 = num_parts * 2
             self.rigid_prim = RigidPrim(
                 prim_paths_expr=clone_paths,
                 name="rigid_prim_view"
@@ -192,9 +163,7 @@ class SceneBuilder:
 
             total_parts = num_parts * 2
             random_indices = np.random.permutation(np.arange(total_parts))
-
             start_position = -0.3 - total_parts * self.part_cfg['part_distance']
-
             init_positions = np.column_stack([
                 np.linspace(start_position, -0.3, total_parts),
                 np.full(total_parts, 0.278),
@@ -206,7 +175,7 @@ class SceneBuilder:
                 indices=random_indices
             )
 
-            # 保存 Task2 初始位姿，用于 reset
+            # 保存 Task2 初始位姿，用于 scatter_after_reset 和 reset
             self._task2_initial_positions = init_positions.copy()
             self._task2_initial_indices = random_indices.copy()
 
@@ -391,7 +360,7 @@ class SceneBuilder:
         if task == 1:
             return task_cfg.get('part', {}).get('num_parts', 2) * 2
         elif task == 2:
-            return task_cfg.get('part', {}).get('num_parts', 5) * 2
+            return task_cfg.get('part', {}).get('num_parts', 4) * 2
         elif task == 3:
             num_boxes = len(task_cfg.get('box', {}).get('box_position', []))
             num_parts = task_cfg.get('part', {}).get('num_parts', 3)
@@ -920,6 +889,18 @@ class SceneBuilder:
         if task == 1:
             self._scatter_parts_direct(plane_index=0)
             print(f"[SceneBuilder] Task1 scatter_after_reset: 已随机散布 {len(self.parts_prim_paths)} 个零件")
+        elif task == 2:
+            # world.reset() 后物理视图已就绪，用随机顺序设置初始位姿并清零速度
+            total_parts = len(self.parts_prim_paths)
+            random_indices = np.random.permutation(np.arange(total_parts))
+            self.rigid_prim.set_world_poses(
+                positions=self._task2_initial_positions,
+                indices=random_indices
+            )
+            self.rigid_prim.set_velocities(velocities=np.zeros((total_parts, 6)))
+            # 更新本轮随机顺序，供 reset() 复用
+            self._task2_initial_indices = random_indices.copy()
+            print(f"[SceneBuilder] Task2 scatter_after_reset: 已设置 {total_parts} 个零件初始位姿")
         elif task == 3:
             num_groups = len(self.box_cfg['box_position'])
             parts_per_group = 3
@@ -1106,19 +1087,14 @@ class SceneBuilder:
             except Exception as e:
                 print(f"[SceneBuilder] 传送带停止失败: {e}")
 
-            # 官方标准：10个零件（5A + 5B）
-            random_indices = np.random.permutation(np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
-            # 清零速度和角速度，防止物体保留上一轮运动状态
-            # 注意：rigid_prim 包含所有 /Root/Part_.* 匹配的 prim（包括原始的A/B共12个）
-            # 只需要清零克隆的10个零件的速度
-            self.rigid_prim.set_velocities(velocities=np.zeros((10, 6)))
-            # 恢复初始位姿，随机排列顺序
+            total_parts = len(self.parts_prim_paths)
+            random_indices = np.random.permutation(np.arange(total_parts))
+            self.rigid_prim.set_velocities(velocities=np.zeros((total_parts, 6)))
             self.rigid_prim.set_world_poses(
                 positions=self._task2_initial_positions,
                 indices=random_indices
             )
-            # 再次清零速度，确保位姿设置后速度为零
-            self.rigid_prim.set_velocities(velocities=np.zeros((10, 6)))
+            self.rigid_prim.set_velocities(velocities=np.zeros((total_parts, 6)))
 
             # 重新启动传送带（沿 X 轴正方向，速度 0.1 m/s）
             try:

@@ -10,7 +10,7 @@ task_number: 2
 part:
   part_a_usd: "Collected_Part_B_ori_color/Part_B.usd"
   part_b_usd: "Collected_Task2_Part_A/Task2_Part_A.usd"
-  num_parts: 5
+  num_parts: 4
   part_distance: 0.4
 
 plane:
