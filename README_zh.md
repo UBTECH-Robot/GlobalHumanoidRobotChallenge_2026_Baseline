@@ -26,7 +26,6 @@
 | 🤖**仿真环境**   | 基于 NVIDIA Isaac Sim 的高保真机器人仿真                        |
 | 📊**数据采集**   | 支持键盘、Pico 等遥操作；输出**LeRobotDataset V2.1** 格式 |
 | 🧠**模型训练**   | 支持**ACT**、**Pi0** 等模仿学习算法                 |
-| 📦**预训练权重** | 官方基线权重，可直接部署或微调                                  |
 
 ---
 
@@ -38,7 +37,6 @@
 | ----------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | 🤖 仿真环境与机器人资产 | `assets/`（Git 子模块）   | [UBTECH-Robotics/challenge2026_assets](https://huggingface.co/UBTECH-Robotics/challenge2026_assets)            |
 | 📊 训练数据集           | `datasets/`               | [UBTECH-Robotics/challenge2026_dataset](https://huggingface.co/datasets/UBTECH-Robotics/challenge2026_dataset) |
-| 🏋️ 预训练模型权重     | `challenge2026_baseline/` | [UBTECH-Robotics/challenge2026_baseline](https://huggingface.co/UBTECH-Robotics/challenge2026_baseline)        |
 
 ### 快速下载
 
@@ -55,8 +53,6 @@ git submodule update --init --recursive
 # 下载训练数据集
 huggingface-cli download UBTECH-Robotics/challenge2026_dataset --local-dir ./datasets --repo-type dataset
 
-# 下载预训练权重
-huggingface-cli download UBTECH-Robotics/challenge2026_baseline --local-dir ./challenge2026_baseline --repo-type model
 ```
 
 ---
@@ -240,7 +236,7 @@ HOST_WORKSPACE=/my/project/path ./run.sh
 
 | 参数                    | 说明                           | 默认值 / 备注 |
 | ----------------------- | ------------------------------ | ------------- |
-| `control.task`        | 任务名称，用于加载对应场景配置 | `task4`     |
+| `control.task`        | 任务名称，用于加载对应场景配置 | `Packing_Box` |
 | `control.root`        | 数据集本地根路径               | 必填          |
 | `control.repo_id`     | 数据集 ID                      | 必填          |
 | `control.episode`     | 要回放的回合编号（从 0 开始）  | 必填          |
@@ -505,11 +501,6 @@ HOST_WORKSPACE=/my/project/path ./run.sh
 
 ```text
 .
-├── challenge2026_baseline/         # 预训练模型权重（从 HF 下载）
-│   ├── Part_Sorting/
-│   ├── Conveyor_Sorting/
-│   ├── Foam_Inlaying/
-│   └── Packing_Box/
 ├── datasets/                       # 本地训练数据集目录
 │   ├── Part_Sorting/
 │   ├── Conveyor_Sorting/
@@ -557,7 +548,7 @@ HOST_WORKSPACE=/my/project/path ./run.sh
 
 LeRobot 的 `walker_s2_sim` 通过 `WalkerS2SimRobotConfig` 读取 `task_cfg_path`，再解析其中的 `root_path` 指向 `assets/resources/`。
 
-示例 `Ubtech_sim/config/task1.yaml`：
+示例 `Ubtech_sim/config/Part_Sorting.yaml`：
 
 ```yaml
 root_path: "../assets/resources/"
@@ -695,7 +686,6 @@ pre-commit install
 | 🤗[LeRobot](https://github.com/huggingface/lerobot)                                              | 机器人学习底层框架 |
 | 🤗[challenge2026_assets](https://huggingface.co/UBTECH-Robotics/challenge2026_assets)            | 仿真资产           |
 | 🤗[challenge2026_dataset](https://huggingface.co/datasets/UBTECH-Robotics/challenge2026_dataset) | 训练数据集         |
-| 🤗[challenge2026_baseline](https://huggingface.co/UBTECH-Robotics/challenge2026_baseline)        | 预训练权重         |
 
 ---
 
