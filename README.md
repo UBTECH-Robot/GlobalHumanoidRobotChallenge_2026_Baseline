@@ -88,7 +88,7 @@ Build the image from Dockefile.
 cd GlobalHumanoidRobotChallenge_2026_Baseline/
 
 # Build the container
-docker build --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ -t <image_name> -f Dockerfile .
+docker build --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ -t GHRC_2026:v0 -f Dockerfile .
 ```
 
 Start from the repository root:
@@ -103,7 +103,7 @@ sudo ./run.sh
 | Variable                | Description                 | Default                                                  |
 | ----------------------- | --------------------------- | -------------------------------------------------------- |
 | `IMAGE_NAME`          | Docker image name           | `GHRC_2026:v0`                            |
-| `CONTAINER_NAME`      | Container name              | `isaac_sim_lerobot`                                    |
+| `CONTAINER_NAME`      | Container name              | `isaac_sim_ubt`                                    |
 | `HOST_WORKSPACE`      | Host project path           | directory of `run.sh`                                  |
 | `CONTAINER_WORKSPACE` | Container workspace path    | `/workspace/GlobalHumanoidRobotChallenge_2026_Baseline` |
 | `SHM_SIZE`            | Shared memory size          | `8g`                                                   |

@@ -88,7 +88,7 @@ huggingface-cli download UBTECH-Robotics/challenge2026_dataset --local-dir ./dat
 cd GlobalHumanoidRobotChallenge_2026_Baseline/
 
 # 构建容器
-docker build --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ -t <镜像名称> -f Dockerfile .
+docker build --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ -t GHRC_2026:v0 -f Dockerfile .
 ```
 
 从项目根目录启动：
@@ -103,7 +103,7 @@ sudo ./run.sh
 | 环境变量                | 说明                 | 默认值                                                   |
 | ----------------------- | -------------------- | -------------------------------------------------------- |
 | `IMAGE_NAME`          | Docker 镜像名称      | `GHRC_2026:v0`                            |
-| `CONTAINER_NAME`      | 容器名称             | `isaac_sim_lerobot`                                    |
+| `CONTAINER_NAME`      | 容器名称             | `isaac_sim_ubt`                                    |
 | `HOST_WORKSPACE`      | 主机项目目录路径     | `run.sh` 所在目录                                      |
 | `CONTAINER_WORKSPACE` | 容器内工作目录路径   | `/workspace/GlobalHumanoidRobotChallenge_2026_Baseline` |
 | `SHM_SIZE`            | 共享内存大小         | `8g`                                                   |
