@@ -40,7 +40,7 @@
 ### 快速下载
 
 ```bash
-# 安装 huggingface-cli
+# 安装 Hugging Face CLI
 pip install huggingface-hub
 
 # 获取仿真资产
@@ -91,7 +91,7 @@ cd GlobalHumanoidRobotChallenge_2026_Baseline/
 # 构建容器
 docker build --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ -t ghrc_2026:v0 -f Dockerfile .
 
-# # If encountered network connectivity issues, try:
+# 如果报错网络连接问题，尝试修改运行：
 docker build --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/ -t ghrc_2026:v0 -f Dockerfile .
 ```
 
@@ -235,7 +235,7 @@ HOST_WORKSPACE=/my/project/path ./run.sh
 | `control.task`           | 任务名称                | `Packing_Box` |
 | `control.fps`            | 采集帧率                | `30`          |
 | `control.single_task`    | 任务描述文本            | 可选            |
-| `control.repo_id`        | 数据集 ID（HF）         | 必填            |
+| `control.repo_id`        | 数据集 ID               | 必填            |
 | `control.num_episodes`   | 采集回合数              | `50`          |
 | `control.episode_time_s` | 每回合时长（秒）        | `10000`       |
 | `control.reset_time_s`   | 回合重置间隔（秒）      | `10`          |
@@ -489,8 +489,8 @@ scene_usd: "Collected_Task1_PartA_ori_color/scene.usd"
 
 | 模块                  | 说明                                               |
 | --------------------- | -------------------------------------------------- |
-| `config_loader`     | 加载 YAML 并解析绝对路径                           |
-| `SceneBuilder`      | 构建仿真场景，加载桌子、箱子、零件、机器人等       |
+| `config_loader`     | 加载 YAML 并解析路径；将 `root_path` 转换为绝对路径  |
+| `SceneBuilder`      | 构建并初始化仿真场景；从 `assets/resources/` 加载 USD   |
 | `RobotArticulation` | WalkerS2 控制接口，封装双臂 IK、力传感器与相机数据 |
 | `DualArmIK`         | 基于 Pinocchio 的双臂逆运动学                      |
 | `GraspPlanner`      | 抓取目标规划、选臂与姿态跟踪                       |

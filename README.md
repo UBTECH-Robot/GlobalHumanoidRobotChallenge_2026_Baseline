@@ -89,7 +89,10 @@ Build the image from Dockefile.
 cd GlobalHumanoidRobotChallenge_2026_Baseline/
 
 # Build the container
-docker build --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ -t GHRC_2026:v0 -f Dockerfile .
+docker build --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ -t ghrc_2026:v0 -f Dockerfile .
+
+# If encountered network connectivity issues, try:
+docker build --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/ -t ghrc_2026:v0 -f Dockerfile .
 ```
 
 Start from the repository root:
@@ -510,7 +513,7 @@ Configure `WalkerS2SimRobotConfig` in `lerobot/common/robot_devices/robots/confi
 
 ```python
 root_path: str = "Ubtech_sim"
-task_cfg_path: str = "Ubtech_sim/config/Foam_Inlaying.yaml"
+task_cfg_path: str = "Ubtech_sim/config/Packing_Box.yaml"
 ```
 
 ### Path Reference
