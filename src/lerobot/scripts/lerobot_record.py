@@ -321,25 +321,6 @@ def record_loop(
     display_data: bool = False,
     display_compressed_images: bool = False,
 ):
-    walker_left_arm_keys = [
-        "L_shoulder_pitch_joint.pos",
-        "L_shoulder_roll_joint.pos",
-        "L_shoulder_yaw_joint.pos",
-        "L_elbow_roll_joint.pos",
-        "L_elbow_yaw_joint.pos",
-        "L_wrist_pitch_joint.pos",
-        "L_wrist_roll_joint.pos",
-    ]
-    walker_right_arm_keys = [
-        "R_shoulder_pitch_joint.pos",
-        "R_shoulder_roll_joint.pos",
-        "R_shoulder_yaw_joint.pos",
-        "R_elbow_roll_joint.pos",
-        "R_elbow_yaw_joint.pos",
-        "R_wrist_pitch_joint.pos",
-        "R_wrist_roll_joint.pos",
-    ]
-
     if dataset is not None and dataset.fps != fps:
         raise ValueError(f"The dataset fps should be equal to requested fps ({dataset.fps} != {fps}).")
 
@@ -448,24 +429,6 @@ def record_loop(
             # walker_s2_sim 通过_robot_control_callback接收teleop的控制指令，所以不需要通过teleop_action_processor处理动作了
             if robot.name == "walkerS2":
                 robot_action_to_send = None
-        if policy is not None and robot_action_to_send is not None:
-            if robot.name == "walkerS2" and isinstance(robot_action_to_send, dict):
-                right_arm_positions = [robot_action_to_send[key] for key in walker_right_arm_keys]
-                left_arm_positions = [robot_action_to_send[key] for key in walker_left_arm_keys]
-
-                smoothed_right_arm = robot._robot_interface._smooth_joints(
-                    side="right",
-                    ik_positions=right_arm_positions,
-                )
-                smoothed_left_arm = robot._robot_interface._smooth_joints(
-                    side="left",
-                    ik_positions=left_arm_positions,
-                )
-
-                for key, value in zip(walker_right_arm_keys, smoothed_right_arm):
-                    robot_action_to_send[key] = float(value)
-                for key, value in zip(walker_left_arm_keys, smoothed_left_arm):
-                    robot_action_to_send[key] = float(value)
         _sent_action = robot.send_action(robot_action_to_send)
         # policy.reset()
         action_values = _sent_action

@@ -156,6 +156,14 @@ class WalkerS2sim(Robot):
         # 步数计数器
         self._send_action_step_idx: int = 0
 
+        # 频率监测（墙钟实测）
+        self._phys_cb_count: int = 0
+        self._phys_cb_t0: Optional[float] = None
+        self._render_cb_count: int = 0
+        self._render_cb_t0: Optional[float] = None
+        self.measured_physics_hz: float = 0.0
+        self.measured_render_hz: float = 0.0
+
         # 线性插值回到初始位置
         self._go_home = False
         self._num_interpolation_steps = 200
@@ -263,7 +271,11 @@ class WalkerS2sim(Robot):
 
         task_number = task_cfg.get("task_number", 0)
         if task_number == 1:
-            num_objects = task_cfg.get("part", {}).get("num_parts", 2) * 2
+            part_cfg = task_cfg.get("part", {})
+            fallback_count = part_cfg.get("num_parts", 2)
+            num_a = max(0, int(part_cfg.get("num_parts_a", fallback_count)))
+            num_b = max(0, int(part_cfg.get("num_parts_b", fallback_count)))
+            num_objects = num_a + num_b
         elif task_number == 2:
             # Task2 tracks two part types, each with num_parts instances.
             num_objects = task_cfg.get("part", {}).get("num_parts", 5) * 2
@@ -279,30 +291,34 @@ class WalkerS2sim(Robot):
         return num_objects * 7
 
     @cached_property
+    def _vel_tor_features(self) -> dict[str, type]:
+        """关节速度和扭矩特征 (28 维：14 臂关节速度 + 14 臂关节扭矩)"""
+        return dict.fromkeys(
+            (
+                "L_shoulder_pitch_joint.vel", "L_shoulder_roll_joint.vel", "L_shoulder_yaw_joint.vel",
+                "L_elbow_roll_joint.vel", "L_elbow_yaw_joint.vel", "L_wrist_pitch_joint.vel", "L_wrist_roll_joint.vel",
+                "R_shoulder_pitch_joint.vel", "R_shoulder_roll_joint.vel", "R_shoulder_yaw_joint.vel",
+                "R_elbow_roll_joint.vel", "R_elbow_yaw_joint.vel", "R_wrist_pitch_joint.vel", "R_wrist_roll_joint.vel",
+                "L_shoulder_pitch_joint.tor", "L_shoulder_roll_joint.tor", "L_shoulder_yaw_joint.tor",
+                "L_elbow_roll_joint.tor", "L_elbow_yaw_joint.tor", "L_wrist_pitch_joint.tor", "L_wrist_roll_joint.tor",
+                "R_shoulder_pitch_joint.tor", "R_shoulder_roll_joint.tor", "R_shoulder_yaw_joint.tor",
+                "R_elbow_roll_joint.tor", "R_elbow_yaw_joint.tor", "R_wrist_pitch_joint.tor", "R_wrist_roll_joint.tor",
+            ),
+            float,
+        )
+
+    @cached_property
     def _env_state_features(self) -> dict[str, type]:
         """环境物体位姿特征定义，每个物体 7 个自由度：x, y, z, qx, qy, qz, qw。
 
         命名格式：object_1_x, object_1_y, object_1_z, object_1_qx, object_1_qy, object_1_qz, object_1_qw,
                  object_2_x, ...
         """
-        task_cfg = getattr(self.config, "task_cfg", {})
-        if not task_cfg:
+        env_state_dim = self.env_state_dim
+        if env_state_dim == 0:
             return {}
 
-        task_number = task_cfg.get("task_number", 0)
-        if task_number == 1:
-            num_objects = task_cfg.get("part", {}).get("num_parts", 2) * 2
-        elif task_number == 2:
-            # Task2 tracks two part types, each with num_parts instances.
-            num_objects = task_cfg.get("part", {}).get("num_parts", 5) * 2
-        elif task_number == 3:
-            num_boxes = len(task_cfg.get('box', {}).get('box_position', []))
-            num_parts = task_cfg.get('part', {}).get('num_parts', 3)
-            num_objects = num_boxes * num_parts
-        elif task_number == 4:
-            num_objects = 0
-        else:
-            num_objects = 0
+        num_objects = env_state_dim // 7
 
         # 为每个物体生成 7 个特征名
         features = {}
@@ -394,9 +410,16 @@ class WalkerS2sim(Robot):
         if not self.is_connected:
             return
 
-        if self._send_action_step_idx > 0 and self._send_action_step_idx % 200 == 0 and self._send_action_step_idx != getattr(self, '_last_logged_step', -1):
-            self._last_logged_step = self._send_action_step_idx
-            logger.info(f"[callback] step={self._send_action_step_idx}, step_size={step_size:.4f}")
+        import time as _time
+        _now = _time.perf_counter()
+        if self._phys_cb_t0 is None:
+            self._phys_cb_t0 = _now
+        self._phys_cb_count += 1
+        _elapsed = _now - self._phys_cb_t0
+        if _elapsed >= 1.0:
+            self.measured_physics_hz = self._phys_cb_count / _elapsed
+            self._phys_cb_count = 0
+            self._phys_cb_t0 = _now
 
         # 检查 go_home 按键（从 teleop 读取按键状态）
         if self._teleop is not None:
@@ -438,10 +461,10 @@ class WalkerS2sim(Robot):
                 self._hold_finger_positions = np.array([self._robot_interface.gripper_open_width]*4)
                 # self._hold_finger_positions = abs_action[14:18].copy()
             if abs_action.shape[0] >= 20:
-                self._left_gripping = float(abs_action[18]) > 0.5
+                self._left_gripping = float(abs_action[18]) < -0.5
                 if self._left_gripping:
                     self._hold_finger_positions[:2] = np.array([self._robot_interface.gripper_close_width]*2)
-                self._right_gripping = float(abs_action[19]) > 0.5
+                self._right_gripping = float(abs_action[19]) < -0.5
                 if self._right_gripping:
                     self._hold_finger_positions[2:4] = np.array([self._robot_interface.gripper_close_width]*2)
             print(f"[_robot_control_callback] left_gripping={self._left_gripping}, right_gripping={self._right_gripping}")
@@ -567,6 +590,16 @@ class WalkerS2sim(Robot):
         """渲染回调：抓取相机图像并缓存"""
         if not self.is_connected:
             return
+        import time as _time
+        _now = _time.perf_counter()
+        if self._render_cb_t0 is None:
+            self._render_cb_t0 = _now
+        self._render_cb_count += 1
+        _elapsed = _now - self._render_cb_t0
+        if _elapsed >= 1.0:
+            self.measured_render_hz = self._render_cb_count / _elapsed
+            self._render_cb_count = 0
+            self._render_cb_t0 = _now
 
         camera_data: dict[str, np.ndarray] = {}
         for cam_name in self.CAMERA_NAMES:
@@ -853,8 +886,8 @@ class WalkerS2sim(Robot):
                         "L_finger2_joint.pos": finger_pos[1],
                         "R_finger1_joint.pos": finger_pos[2],
                         "R_finger2_joint.pos": finger_pos[3],
-                        "left_gripper": 1.0 if self._left_gripping else -1.0,
-                        "right_gripper": 1.0 if self._right_gripping else -1.0,
+                        "left_gripper": -1.0 if self._left_gripping else 1.0,
+                        "right_gripper": -1.0 if self._right_gripping else 1.0,
                     }
                 else:
                     raise RuntimeError("无法获取关节状态以构建 action 字典")
@@ -912,14 +945,21 @@ class WalkerS2sim(Robot):
                 for i, joint_name in enumerate(arm_joint_names):
                     obs[f"{joint_name}.pos"] = torch.tensor(arm_pos[i], dtype=torch.float32)
 
+                # 14 臂关节速度和扭矩（侧录用，不进 observation.state）
+                arm_vel = joints_states.get('arm_velocities', [0.0] * 14)
+                arm_tau = joints_states.get('arm_torques', [0.0] * 14)
+                for i, joint_name in enumerate(arm_joint_names):
+                    obs[f"_vel_{joint_name}"] = torch.tensor(arm_vel[i], dtype=torch.float32)
+                    obs[f"_tor_{joint_name}"] = torch.tensor(arm_tau[i], dtype=torch.float32)
+
                 # 4 手指关节
                 finger_joint_names = ["L_finger1_joint", "L_finger2_joint", "R_finger1_joint", "R_finger2_joint"]
                 for i, joint_name in enumerate(finger_joint_names):
                     obs[f"{joint_name}.pos"] = torch.tensor(finger_pos[i], dtype=torch.float32)
 
                 # 2 夹持器控制
-                obs["left_gripper"] = torch.tensor(1.0 if self._left_gripping else -1.0, dtype=torch.float32)
-                obs["right_gripper"] = torch.tensor(1.0 if self._right_gripping else -1.0, dtype=torch.float32)
+                obs["left_gripper"] = torch.tensor(-1.0 if self._left_gripping else 1.0, dtype=torch.float32)
+                obs["right_gripper"] = torch.tensor(-1.0 if self._right_gripping else 1.0, dtype=torch.float32)
             else:
                 raise RuntimeError("无法获取关节状态")
 
