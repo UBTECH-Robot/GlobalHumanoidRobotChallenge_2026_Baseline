@@ -26,7 +26,7 @@ ConveyorBelt:
   ConveyorBelt_scale: 
   - [1.0, 1.0, 1.0]
   ConveyorBelt_speed:
-  - [0.0142, 0.0, 0.0]
+  - [0.0120, 0.0, 0.0]
 
 table:
   table_usd: 'Collected_table_v2/table_v2.usd'
