@@ -640,7 +640,10 @@ class IsaacSimRobotInterface:
         side semantics:
         - None: expects 4D [L_f1, L_f2, R_f1, R_f2]
         - "left"/"right": expects 2D
+
+        NaN in target_fingers means "skip position control for that joint" (effort-only mode).
         """
+        import math
         from isaacsim.core.utils.types import ArticulationActions
 
         if self._articulation is None:
@@ -653,20 +656,31 @@ class IsaacSimRobotInterface:
         if side == "left":
             if target_fingers.shape[0] != 2:
                 raise ValueError(f"left GripperExpected2joint positions，got {target_fingers.shape[0]} ")
-            control_indices = torch.tensor(self.finger_joint_indices[:2], dtype=torch.int32)
+            all_indices = self.finger_joint_indices[:2]
         elif side == "right":
             if target_fingers.shape[0] != 2:
                 raise ValueError(f"right GripperExpected2joint positions，got {target_fingers.shape[0]} ")
-            control_indices = torch.tensor(self.finger_joint_indices[2:4], dtype=torch.int32)
+            all_indices = self.finger_joint_indices[2:4]
         else:
             if target_fingers.shape[0] != 4:
                 raise ValueError(f"机器人接口Expected4Finger joint位置，got {target_fingers.shape[0]} ")
-            control_indices = torch.tensor(self.finger_joint_indices, dtype=torch.int32)
+            all_indices = self.finger_joint_indices
+
+        # Filter out NaN: NaN means effort-only for that joint, skip position drive
+        valid_pos = []
+        valid_idx = []
+        for pos, idx in zip(target_fingers.tolist(), all_indices):
+            if not math.isnan(pos):
+                valid_pos.append(pos)
+                valid_idx.append(idx)
+
+        if not valid_pos:
+            return
 
         self._articulation.apply_action(
             ArticulationActions(
-                joint_positions=target_fingers.unsqueeze(0),
-                joint_indices=control_indices
+                joint_positions=torch.tensor([valid_pos], dtype=torch.float32),
+                joint_indices=torch.tensor(valid_idx, dtype=torch.int32),
             )
         )
 

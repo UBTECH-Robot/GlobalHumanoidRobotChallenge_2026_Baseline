@@ -543,31 +543,48 @@ class WalkerS2sim(Robot):
             target_arm_positions=self._hold_arm_positions.tolist(),
             task_num=self.config.task_cfg.get("task_number", 1)
         )
-        self._robot_interface.set_finger_positions(
-            target_fingers=self._hold_finger_positions.tolist(),
-            task_num=self.config.task_cfg.get("task_number", 1)
-        )
         self._robot_interface.set_body_joint_positions(
             target_body_positions=0.0,
             task_num=self.config.task_cfg.get("task_number", 1)
         )
 
-        # 夹持器控制：抓取时力控，非抓取时位置控
+        # 夹持器控制：
+        #   夹持时：NaN（关闭PD）+ close_tau（纯力矩），避免位置+力矩叠加导致过夹
+        #   释放时：open_width（PD开爪）+ open_tau if stuck（主动助力防卡死）
         close_tau = getattr(self._robot_interface, "gripper_close_tau", 100.0)
-        efforts = [0.0, 0.0, 0.0, 0.0]
-        finger_pos = self._hold_finger_positions.copy()
+        open_tau = getattr(self._robot_interface, "gripper_open_tau", -100.0)
+        open_width = self._robot_interface.gripper_open_width
+        stuck_threshold = 0.005  # 手指实际位置超过 open_width 5mm 以上视为卡住
 
-        if self._left_gripping:
-            efforts[0] = close_tau
-            efforts[1] = close_tau
-            finger_pos[0] = float("nan")
-            finger_pos[1] = float("nan")
-        if self._right_gripping:
-            efforts[2] = close_tau
-            efforts[3] = close_tau
-            finger_pos[2] = float("nan")
-            finger_pos[3] = float("nan")
+        # 读取实际手指位置用于卡死检测
+        _states = self._robot_interface.get_joint_states()
+        actual_finger_pos = (
+            np.array(_states["finger_positions"], dtype=np.float32)
+            if _states is not None
+            else np.array([open_width] * 4, dtype=np.float32)
+        )
 
+        gripping = [
+            self._left_gripping, self._left_gripping,
+            self._right_gripping, self._right_gripping,
+        ]
+        finger_pos_cmd = []
+        efforts = []
+        for i, is_gripping in enumerate(gripping):
+            if is_gripping:
+                finger_pos_cmd.append(float("nan"))  # 关闭PD，不与力矩叠加
+                efforts.append(close_tau)
+            else:
+                finger_pos_cmd.append(open_width)    # PD 驱动开爪
+                if actual_finger_pos[i] > open_width + stuck_threshold:
+                    efforts.append(open_tau)          # 主动开爪助力（防卡死）
+                else:
+                    efforts.append(0.0)
+
+        self._robot_interface.set_finger_positions(
+            target_fingers=finger_pos_cmd,
+            task_num=self.config.task_cfg.get("task_number", 1)
+        )
         self._robot_interface.apply_finger_efforts(efforts)
 
     def _score_input_record_callback(self, step_size: float) -> None:
