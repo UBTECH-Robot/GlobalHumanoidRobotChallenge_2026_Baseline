@@ -551,7 +551,7 @@ class WalkerS2sim(Robot):
         # 夹持器控制：
         #   夹持时：NaN（关闭PD）+ close_tau（纯力矩），避免位置+力矩叠加导致过夹
         #   释放时：open_width（PD开爪）+ open_tau if stuck（主动助力防卡死）
-        close_tau = getattr(self._robot_interface, "gripper_close_tau", 100.0)
+        close_tau = getattr(self._robot_interface, "gripper_close_tau", 200.0)
         open_tau = getattr(self._robot_interface, "gripper_open_tau", -100.0)
         open_width = self._robot_interface.gripper_open_width
         stuck_threshold = 0.005  # 手指实际位置超过 open_width 5mm 以上视为卡住

@@ -222,7 +222,7 @@ class IsaacSimRobotInterface:
     gripper_open_width = -0.0215
     gripper_close_width = 0.01
     gripper_open_tau = -100.0
-    gripper_close_tau = 100.0
+    gripper_close_tau = 200.0
 
     sixforce_joint_names: list[str] = [
         "L_sixforce_joint",
